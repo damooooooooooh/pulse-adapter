@@ -12,6 +12,8 @@
 const {Adapter, Database, Device, Event, Property} = require('gateway-addon');
 const manifest = require('./manifest.json');
 
+var timer = null;
+
 class PulseProperty extends Property {
   constructor(device, name, propertyDescr) {
     super(device, name, propertyDescr);
@@ -33,15 +35,24 @@ class PulseProperty extends Property {
         testCurrValue = !testCurrValue;
         testNewValue = !testNewValue;
       }
-      if (testNewValue && !testCurrValue) {
-        // Value changed from false to true - this is our trigger
-        this.setCachedValue(value);
-        console.log('Pulse:', this.device.name, 'set to:', this.value);
-        resolve(this.value);
-        this.device.notifyPropertyChanged(this);
-        this.device.notifyEvent(this);
 
-        setTimeout(() => {
+      this.setCachedValue(value);
+      console.log('Pulse:', this.device.name, 'set to:', this.value);
+      resolve(this.value);
+      this.device.notifyPropertyChanged(this);
+      this.device.notifyEvent(this);
+      
+      if ((this.device.pulseConfig.replay || 
+            (value === false || (this.device.pulseConfig.invert && !value)))
+               && timer != null) {
+        console.log('Clearing the existing timer')
+        clearTimeout(timer);
+      }
+
+      // Only set the timeout if the incoming value is On or it is inverted
+      if (value || (this.device.pulseConfig.invert && !value)) {
+        console.log('Setting the timer')
+        timer = setTimeout(() => {
           this.setCachedValue(!value);
           console.log('Pulse:', this.device.name, 'set to:', this.value);
           this.device.notifyPropertyChanged(this);
